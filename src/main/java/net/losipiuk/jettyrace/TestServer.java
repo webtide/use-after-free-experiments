@@ -14,13 +14,19 @@
 package net.losipiuk.jettyrace;
 
 import java.io.PrintStream;
+import java.net.URI;
+import java.util.Map;
 import java.util.logging.Handler;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.inject.Binder;
+import com.google.inject.Injector;
 import io.airlift.bootstrap.ApplicationConfigurationException;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
 import io.airlift.event.client.EventModule;
+import io.airlift.http.server.HttpServer;
+import io.airlift.http.server.HttpServerInfo;
 import io.airlift.http.server.HttpServerModule;
 import io.airlift.jaxrs.JaxrsModule;
 import io.airlift.json.JsonModule;
@@ -52,7 +58,8 @@ public final class TestServer
         // now undo what airlift does
         root.setLevel(origLevel); // reset level
         // eliminate airlift handlers
-        for (Handler handler : root.getHandlers()) {
+        for (Handler handler : root.getHandlers())
+        {
             root.removeHandler(handler);
         }
         // restore system.out / system.err
@@ -65,34 +72,58 @@ public final class TestServer
 
     public static void main(String[] args)
     {
-        initLogging();
-        Bootstrap app = new Bootstrap(
-                new TestingNodeModule(),
-                new HttpServerModule(),
-                new JaxrsModule(),
-                new JsonModule(),
-                new TraceTokenModule(),
-                new EventModule(),
-                new TracingModule("blah", "some version"),
-                new AbstractConfigurationAwareModule() {
-                    @Override
-                    protected void setup(Binder binder)
-                    {
-                        jaxrsBinder(binder).bind(TestResource.class);
-                    }
-                });
-
-        try {
-            app.doNotInitializeLogging().initialize();
-            log.info("======== SERVER STARTED ========");
+        try
+        {
+            start(8080);
         }
-        catch (ApplicationConfigurationException e) {
+        catch (ApplicationConfigurationException e)
+        {
             log.error(e.getMessage());
             System.exit(1);
         }
-        catch (Throwable e) {
+        catch (Throwable e)
+        {
             log.error(e);
             System.exit(1);
         }
+    }
+
+    record StartedServer(HttpServer server, URI serverURI) {}
+
+    public static StartedServer start(int port) throws Exception
+    {
+        initLogging();
+
+        Map<String, String> properties = new ImmutableMap.Builder<String, String>()
+            .put("http-server.http.port", "" + port)
+            .build();
+
+        Bootstrap app = new Bootstrap(
+            new TestingNodeModule(),
+            new HttpServerModule(),
+            new JaxrsModule(),
+            new JsonModule(),
+            new TraceTokenModule(),
+            new EventModule(),
+            new TracingModule("blah", "some version"),
+            new AbstractConfigurationAwareModule()
+            {
+                @Override
+                protected void setup(Binder binder)
+                {
+                    jaxrsBinder(binder).bind(TestResource.class);
+                }
+            });
+
+        Injector injector = app
+            .setRequiredConfigurationProperties(properties)
+            .doNotInitializeLogging()
+            .initialize();
+        HttpServer server = injector.getInstance(HttpServer.class);
+        server.start();
+        HttpServerInfo httpServerInfo = injector.getInstance(HttpServerInfo.class);
+        log.info("======== SERVER STARTED ========");
+
+        return new StartedServer(server, httpServerInfo.getHttpUri());
     }
 }

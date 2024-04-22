@@ -15,8 +15,8 @@
     <appender-ref ref="STDOUT" />
     <appender-ref ref="FILE" />
   </root>
-  <logger name="org.eclipse.jetty.server.internal.HttpChannelState" level="DEBUG" />
+  <logger name="org.eclipse.jetty.server.internal.HttpChannelState" level="INFO" />
   <logger name="org.eclipse.jetty.ee10.servlet.AsyncContentProducer" level="INFO" />
   <logger name="org.eclipse.jetty.ee10.servlet.HttpInput" level="INFO" />
-  <logger name="org.glassfish.jersey.servlet.async.AsyncContextDelegateProviderImpl" level="DEBUG" />
+  <logger name="org.glassfish.jersey" level="DEBUG" />
 </configuration>
