@@ -34,6 +34,7 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -42,6 +43,7 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
@@ -67,6 +69,7 @@ public class TestResource
             @Suspended AsyncResponse asyncResponse)
             throws IOException
     {
+        long startMs = System.currentTimeMillis();
         AsyncContext asyncContext = request.getAsyncContext();
 
         ServletInputStream inputStream;
@@ -83,9 +86,8 @@ public class TestResource
         byte[] response = new byte[contentLength];
         ReadListener readListener = new ReadListener()
         {
-            private final List<ListenableFuture<Void>> addDataPagesFutures = new ArrayList<>();
-
             private int bytesRead;
+            private int readCount = 0;
 
             @Override
             public void onDataAvailable()
@@ -101,6 +103,7 @@ public class TestResource
                         if (readLength == -1) {
                             break;
                         }
+                        readCount++;
                         bytesRead += readLength;
                     }
                     else {
@@ -116,6 +119,8 @@ public class TestResource
             @Override
             public void onAllDataRead()
             {
+                long endMs = System.currentTimeMillis();
+                log.info("onAllDataRead: duration=%dms readCount=%d asyncContext=%s", (endMs - startMs), readCount, asyncContext);
                 verify(bytesRead == contentLength,
                         "Actual number of bytes read %s not equal to contentLength %s", bytesRead, contentLength);
 
@@ -129,6 +134,154 @@ public class TestResource
                                 ignored -> Response.ok().build(),
                                 directExecutor()),
                         responseExecutor);
+            }
+
+            @Override
+            public void onError(Throwable throwable)
+            {
+                log.error(throwable, "onError");
+                asyncResponse.resume(Response.status(Response.Status.INTERNAL_SERVER_ERROR));
+            }
+        };
+
+        inputStream.setReadListener(readListener);
+    }
+
+    @POST
+    @Path("readlistenereof")
+    @Consumes(MediaType.APPLICATION_OCTET_STREAM)
+    public void handleWithReadListenerEof(
+        @Context HttpServletRequest request,
+        @HeaderParam(CONTENT_LENGTH) Integer contentLength,
+        @Suspended AsyncResponse asyncResponse)
+        throws IOException
+    {
+        AsyncContext asyncContext = request.getAsyncContext();
+
+        ServletInputStream inputStream;
+        try {
+            inputStream = asyncContext.getRequest().getInputStream();
+        }
+        catch (IOException e) {
+            log.error(e, "error on getInputStream");
+            ((HttpServletResponse) asyncContext.getResponse()).setStatus(SC_INTERNAL_SERVER_ERROR);
+            asyncContext.complete();
+            return;
+        }
+
+        ReadListener readListener = new ReadListener()
+        {
+            private int bytesRead;
+
+            @Override
+            public void onDataAvailable()
+                throws IOException
+            {
+                byte[] buf = new byte[4096];
+                while (inputStream.isReady() && !inputStream.isFinished()) {
+                    int readLength = inputStream.read(buf, 0, buf.length);
+                    if (readLength == -1) {
+                        break;
+                    }
+                    bytesRead += readLength;
+                }
+            }
+
+            @Override
+            public void onAllDataRead()
+            {
+                log.info("onAllDataRead: asyncContext=%s - bytesRead=%d contentLength=%d", asyncContext, bytesRead, contentLength);
+                verify(bytesRead == contentLength,
+                    "Actual number of bytes read %s not equal to contentLength %s", bytesRead, contentLength);
+
+                SettableFuture<Void> future = SettableFuture.create();
+                future.set(null);
+
+                bindAsyncResponse(
+                    asyncResponse,
+                    Futures.transform(
+                        future,
+                        ignored -> Response.ok().build(),
+                        directExecutor()),
+                    responseExecutor);
+            }
+
+            @Override
+            public void onError(Throwable throwable)
+            {
+                log.error(throwable, "onError");
+                asyncResponse.resume(Response.status(Response.Status.INTERNAL_SERVER_ERROR));
+            }
+        };
+
+        inputStream.setReadListener(readListener);
+    }
+
+    @POST
+    @Path("readlistenerslow")
+    @Consumes(MediaType.APPLICATION_OCTET_STREAM)
+    public void handleWithReadListenerSlow(
+        @Context HttpServletRequest request,
+        @HeaderParam(CONTENT_LENGTH) Integer contentLength,
+        @Suspended AsyncResponse asyncResponse)
+        throws IOException
+    {
+        AsyncContext asyncContext = request.getAsyncContext();
+
+        ServletInputStream inputStream;
+        try {
+            inputStream = asyncContext.getRequest().getInputStream();
+        }
+        catch (IOException e) {
+            log.error(e, "error on getInputStream");
+            ((HttpServletResponse) asyncContext.getResponse()).setStatus(SC_INTERNAL_SERVER_ERROR);
+            asyncContext.complete();
+            return;
+        }
+
+        ReadListener readListener = new ReadListener()
+        {
+            private int bytesRead;
+
+            @Override
+            public void onDataAvailable()
+                throws IOException
+            {
+                byte[] buf = new byte[4096];
+                while (inputStream.isReady() && !inputStream.isFinished()) {
+                    int readLength = inputStream.read(buf, 0, buf.length);
+                    if (readLength == -1) {
+                        break;
+                    }
+                    try
+                    {
+                        Thread.sleep(100);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        throw new RuntimeException(e);
+                    }
+                    bytesRead += readLength;
+                }
+            }
+
+            @Override
+            public void onAllDataRead()
+            {
+                log.info("onAllDataRead: asyncContext=%s", asyncContext);
+                verify(bytesRead == contentLength,
+                    "Actual number of bytes read %s not equal to contentLength %s", bytesRead, contentLength);
+
+                SettableFuture<Void> future = SettableFuture.create();
+                future.set(null);
+
+                bindAsyncResponse(
+                    asyncResponse,
+                    Futures.transform(
+                        future,
+                        ignored -> Response.ok().build(),
+                        directExecutor()),
+                    responseExecutor);
             }
 
             @Override
