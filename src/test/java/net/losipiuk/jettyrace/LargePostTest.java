@@ -56,7 +56,7 @@ public class LargePostTest
     public void startClient() throws Exception
     {
         client = new HttpClient();
-        client.setMaxConnectionsPerDestination(10);
+        client.setMaxConnectionsPerDestination(100);
         client.getContentDecoderFactories().clear();
         client.start();
     }
@@ -105,8 +105,8 @@ public class LargePostTest
             }
             LOG.info("Requests Made: {}", count);
             LifeCycle.stop(client);
-            // sleep a bit, let the Exceptions flow
-            TimeUnit.SECONDS.sleep(10);
+            // Uncomment to sleep a bit, let the Exceptions flow
+            // TimeUnit.SECONDS.sleep(10);
             executor.shutdown();
         }
     }
