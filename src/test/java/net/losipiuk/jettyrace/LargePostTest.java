@@ -28,6 +28,7 @@ import org.eclipse.jetty.client.ContentResponse;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpMethod;
+import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.junit.jupiter.api.AfterEach;
@@ -85,7 +86,7 @@ public class LargePostTest
         try(ExecutorService executor = Executors.newCachedThreadPool())
         {
             List<Callable<Integer>> tasks = new ArrayList<>();
-            for (int i = 0; i <= clientThreads; i++)
+            for (int i = 0; i < clientThreads; i++)
             {
                 tasks.add(new ClientPostTask(client, i, "/api/test/readlistener/", clientRequestsPerThread, uri, postData));
             }
@@ -137,6 +138,7 @@ public class LargePostTest
             for (int i = 0; i <= requestCount; i++)
             {
                 ContentResponse response = client.newRequest(uri)
+                    .version(HttpVersion.HTTP_1_0)
                     .method(HttpMethod.POST)
                     .path(path + "?id=%d&r=%d".formatted(clientId, i))
                     .body(new BytesRequestContent(postData))
