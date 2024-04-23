@@ -210,7 +210,7 @@ public class TestResource
             public void onError(Throwable throwable)
             {
                 log.error(throwable, "onError");
-                asyncResponse.resume(Response.status(Response.Status.INTERNAL_SERVER_ERROR));
+                asyncResponse.resume(Response.status(Response.Status.INTERNAL_SERVER_ERROR).build());
             }
         };
 
@@ -288,7 +288,7 @@ public class TestResource
             public void onError(Throwable throwable)
             {
                 log.error(throwable, "onError");
-                asyncResponse.resume(Response.status(Response.Status.INTERNAL_SERVER_ERROR));
+                asyncResponse.resume(Response.status(Response.Status.INTERNAL_SERVER_ERROR).build());
             }
         };
 
