@@ -34,3 +34,4 @@ product-test-reports
 **/dependency-reduced-pom.xml
 logs/*
 testdata/*
+*.pcapng

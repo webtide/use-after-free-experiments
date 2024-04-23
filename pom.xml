@@ -18,7 +18,7 @@
         <project.build.targetJdk>21</project.build.targetJdk>
         <air.java.version>21.0.1</air.java.version>
         <air.check.skip-pmd>true</air.check.skip-pmd>
-        <dep.jetty.version>12.0.8</dep.jetty.version>
+        <dep.jetty.version>12.0.9-SNAPSHOT</dep.jetty.version>
         <dep.slf4j.version>2.0.13</dep.slf4j.version>
         <skipTests>true</skipTests>
         <air.check.skip-checkstyle>true</air.check.skip-checkstyle>
