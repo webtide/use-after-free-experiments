@@ -13,8 +13,14 @@
  */
 package net.losipiuk.jettyrace;
 
+import java.io.IOException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
+
 import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
@@ -33,17 +39,7 @@ import jakarta.ws.rs.container.Suspended;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
+import org.eclipse.jetty.http.BadMessageException;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
@@ -120,7 +116,8 @@ public class TestResource
             public void onAllDataRead()
             {
                 long endMs = System.currentTimeMillis();
-                log.info("onAllDataRead: duration=%dms readCount=%d asyncContext=%s", (endMs - startMs), readCount, asyncContext);
+                if (log.isDebugEnabled())
+                    log.debug("onAllDataRead: duration=%dms readCount=%d asyncContext=%s", (endMs - startMs), readCount, asyncContext);
                 verify(bytesRead == contentLength,
                         "Actual number of bytes read %s not equal to contentLength %s", bytesRead, contentLength);
 
@@ -139,8 +136,18 @@ public class TestResource
             @Override
             public void onError(Throwable throwable)
             {
-                log.error(throwable, "onError");
+                logThrowable("onError", throwable);
                 asyncResponse.resume(Response.status(Response.Status.INTERNAL_SERVER_ERROR).build());
+            }
+
+            private void logThrowable(String msg, Throwable throwable)
+            {
+                if (throwable instanceof BadMessageException)
+                {
+                    if (throwable.getMessage().contains("EOF"))
+                        return; // ignore EOF
+                }
+                log.error(throwable, msg);
             }
         };
 
